@@ -2,23 +2,84 @@
 <record_update table="sp_widget">
     <sp_widget action="INSERT_OR_UPDATE">
         <category>custom</category>
-        <client_script><![CDATA[function($scope, spUtil) {
+        <client_script><![CDATA[function($scope, spUtil, $http) {
   /* widget controller */
   var c = this;
 	$scope.orderField = "number";
-	
-	$scope.changeSort = function(field){
-		$scope.orderField = field;
-	};
 	
 	// this makes the UI watch the data
 	spUtil.recordWatch($scope, "incident", "", function(name,data){
 		spUtil.update($scope);
 	});
+	
+	$scope.edit = function(instance){
+		$scope.editingRecord = angular.copy(instance)
+	}
+	
+	$scope.reset = function(){
+		$scope.editingRecord = null;
+	}
+	
+	$scope.save = function(){
+		console.log("Saving ... " + $scope.editingRecord.sys_id);
+		$scope.writeIncident($scope.editingRecord.sys_id, 
+												{'short_description': $scope.editingRecord.short_description});
+		$scope.reset();
+	}
+	
+	// User the Table API to put for a record
+	// in as data, tht will be the update
+	$scope.writeIncident = function(sys_id, data){
+		$http({
+			method: 'PUT',
+			url: '/api/now/table/incident/' + sys_id,
+			headers: {'Content-Type' : 'application/json'},
+			data: data
+		});
+	};
+	
+	$scope.changeSort = function(field){
+		if($scope.orderField == field){
+			$scope.orderReverse = !$scope.orderReverse;
+		}
+		else {
+			$scope.orderField = field;
+		}
+	}
+	
+	$scope.getPriorityClass = function(incident) {
+		return "Priority" + incident.priority;
+	}
+	
 }]]></client_script>
         <controller_as>c</controller_as>
         <css>table, th, td {
 	border: 1px solid black;
+  padding: 5px;
+}
+
+button {
+  background-color: #4cAF50;
+  border: 1px;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  border-radius: 15px;
+}
+
+.Priority1 {
+  background-color: red
+}
+
+.Priority2 {
+  background-color: orange
+}
+
+.Priority3 {
+  background-color: yellow
 }</css>
         <data_table>sp_instance</data_table>
         <demo_data/>
@@ -40,7 +101,7 @@
 	var gr = new GlideRecord('incident');
 	gr.addActiveQuery();
 	gr.setLimit(10);
-	gr.orderByDesc('sys_updated_en');
+	gr.orderByDesc('sys_updated_on');
 	gr.query();
 	
 	while(gr.next()){
@@ -49,6 +110,7 @@
 		incident.short_description = gr.getValue('short_description');
 		incident.sys_id = gr.getUniqueValue();
 		incident.sys_updated_on = gr.getValue('sys_updated_on');
+		incident.priority = gr.getValue('priority')
 		data.incidents.push(incident);
 	}
 })();]]></script>
@@ -57,17 +119,18 @@
         <sys_created_by>admin</sys_created_by>
         <sys_created_on>2018-04-11 20:02:39</sys_created_on>
         <sys_id>eaba9b9b4fd113005ee03b718110c728</sys_id>
-        <sys_mod_count>20</sys_mod_count>
+        <sys_mod_count>48</sys_mod_count>
         <sys_name>TechNow28Widget</sys_name>
         <sys_package display_value="Angular App" source="x_208568_angular_a">efee6a764fd513005ee03b718110c7ca</sys_package>
         <sys_policy/>
         <sys_scope display_value="Angular App">efee6a764fd513005ee03b718110c7ca</sys_scope>
         <sys_update_name>sp_widget_eaba9b9b4fd113005ee03b718110c728</sys_update_name>
         <sys_updated_by>admin</sys_updated_by>
-        <sys_updated_on>2018-04-11 22:27:42</sys_updated_on>
+        <sys_updated_on>2018-04-13 15:30:48</sys_updated_on>
         <template><![CDATA[<div>
 <!-- your widget template -->
-  <pre>Sort by = {{orderField}}</pre>
+  <pre>Editing = {{editingRecord.sys_id}}</pre>
+  <label>Search: </label><input type="text" ng-model="searchText">
   <table>
     <tr>
       <th>
@@ -83,12 +146,20 @@
         </button>
       </th>
     </tr>
-    <tr ng-repeat="incident in data.incidents | orderBy:orderField">
-      <td>{{incident.number}}
+    <tr ng-repeat="incident in data.incidents | orderBy:orderField:orderReverse | filter:searchText">
+      <td ng-class="getPriorityClass(incident)">{{incident.number}}
       </td>
-      <td>{{incident.short_description}}
+      <td ng-if="incident.sys_id == editingRecord.sys_id"><input type="text" ng-model="editingRecord.short_description"/>
       </td>
-      <td>{{incident.sys_updated_on}}
+      <td ng-if="incident.sys_id != editingRecord.sys_id">{{incident.short_description}}
+      </td>
+      <td ng-if="incident.sys_id != editingRecord.sys_id">{{incident.sys_updated_on}}
+      </td>
+      <td><button ng-click="edit(incident)">Edit</button>
+      </td>
+      <td ng-if="incident.sys_id == editingRecord.sys_id">
+        <button ng-click="save(incident)">Save</button>
+        <button ng-click="reset()">Reset</button>
       </td>
     </tr>
   </table>
